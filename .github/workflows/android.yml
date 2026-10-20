@@ -146,6 +146,12 @@ jobs:
           disable-animations: true
           script: bash ci/device-tests.sh
 
+      - name: Publish device test results
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash ci/report-tests.sh "Device results · API ${{ matrix.api }} · ${{ matrix.profile }}"
+
       - name: Publish failure details
         if: failure()
         env:
