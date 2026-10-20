@@ -57,21 +57,7 @@ jobs:
 
       - name: Check native libraries support 16 KB memory pages (Android 15+ devices, Google Play)
         shell: bash
-        run: |
-          APK=app/build/outputs/apk/release/app-release.apk
-          BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
-          "${BT}zipalign" -c -P 16 4 "$APK" && echo "APK zip alignment: 16 KB OK"
-          rm -rf so && mkdir so && unzip -q -o "$APK" 'lib/*' -d so
-          fail=0
-          for f in so/lib/arm64-v8a/*.so so/lib/x86_64/*.so; do
-            [ -f "$f" ] || continue
-            align=$(readelf -lW "$f" | awk '$1=="LOAD"{print $NF}' | sort -u | tr '\n' ' ')
-            echo "$f: LOAD alignment $align"
-            for a in $align; do
-              [ $((a)) -ge 16384 ] || fail=1
-            done
-          done
-          [ "$fail" -eq 0 ] || { echo "::error::A 64-bit native library is not 16 KB aligned"; exit 1; }
+        run: bash ci/check-16k.sh 2>&1 | tee logs/align.log
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4

@@ -20,6 +20,13 @@ if ls logs/*.log >/dev/null 2>&1; then
   endsection
 fi
 
+# 1a. 16 KB page-size check output, if any
+if [ -s logs/align.log ]; then
+  section "16 KB page-size check"
+  cat logs/align.log >> "$out"
+  endsection
+fi
+
 # 1b. SDK packages listed by the job, if any
 if [ -s logs/sdk-images.txt ]; then
   section "Emulator images and platforms available"
