@@ -4,6 +4,8 @@
 
     <!-- The one sensitive permission: read bank, card and UPI SMS. Asked for only after an in-app explanation. -->
     <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- Reading SMS implies phone hardware; tablets and Chromebooks can still install and use manual mode. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <!-- App lock with fingerprint, face or device PIN. Not a runtime prompt. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
@@ -57,6 +59,7 @@
         android:name=".SpendLensApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"

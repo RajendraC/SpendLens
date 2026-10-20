@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#0F6B4F</color>
     <color name="ic_launcher_background">#0F6B4F</color>
     <!-- Window colour behind the first frame; values-night overrides it for dark mode. -->
     <color name="window_background">#F4F6F3</color>
