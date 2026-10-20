@@ -68,6 +68,12 @@ android {
         animationsDisabled = true
     }
 
+    // UI test helpers shared by the Robolectric tests and the emulator tests.
+    sourceSets {
+        getByName("test").java.srcDir("src/sharedTest/kotlin")
+        getByName("androidTest").java.srcDir("src/sharedTest/kotlin")
+    }
+
     packaging {
         resources {
             excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/LICENSE*")

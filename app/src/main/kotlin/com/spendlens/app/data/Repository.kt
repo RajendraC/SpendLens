@@ -10,11 +10,12 @@ import com.spendlens.core.RuleMatch
 import com.spendlens.core.TxKind
 import android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE
 import android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.withContext
 import java.time.Clock
 
@@ -35,8 +36,24 @@ class Repository(private val db: Db, private val clock: Clock) {
         return r
     }
 
+    /**
+     * Re-runs [block] after every write. A read that fails (for example while Reset is replacing the
+     * database) is skipped rather than ending the flow, so the screen keeps updating afterwards.
+     */
     private fun <T> observe(block: (SupportSQLiteDatabase) -> T): Flow<T> =
-        db.changes.map { read(block) }.distinctUntilChanged()
+        db.changes.transform {
+            val value = try {
+                read(block)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@transform
+            }
+            emit(value)
+        }.distinctUntilChanged()
+
+    /** Runs [block] on the database thread, so no query is in flight while it runs. */
+    suspend fun <T> exclusive(block: () -> T): T = withContext(io) { block() }
 
     /** Opens the database once; throws if the encryption key can't be unlocked on this phone. */
     suspend fun open() = read { it.query("SELECT COUNT(*) FROM categories").use { c -> c.moveToFirst() } }

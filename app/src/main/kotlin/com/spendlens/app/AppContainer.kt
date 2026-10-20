@@ -29,10 +29,14 @@ class AppContainer(
     val importEngine = ImportEngine(sms, repo, clock)
     val appIcons = AppIcons(context)
 
-    /** Erases everything: the database file and, on a phone, the Keystore key that protected it. */
-    fun eraseEverything() {
-        db.destroy()
+    /**
+     * Erases everything: the Keystore key that protected the database, then the database file.
+     * Runs on the database thread so no query can reopen the old file halfway through; the next
+     * read creates a fresh database under a new key.
+     */
+    suspend fun eraseEverything() = repo.exclusive {
         keyManager?.destroy()
+        db.destroy()
     }
 
     fun keyProtection(): String = keyManager?.protectionLevel() ?: "Test database (not encrypted)"

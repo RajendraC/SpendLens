@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -546,7 +545,7 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
     fun performReset() = viewModelScope.launch {
         _confirm.value = null
         _sheet.value = null
-        withContext(Dispatchers.IO) { c.eraseEverything() }
+        c.eraseEverything()
         importUi.value = ImportUi()
         deleteUi.value = DeleteUi()
         monthOffset.value = 0

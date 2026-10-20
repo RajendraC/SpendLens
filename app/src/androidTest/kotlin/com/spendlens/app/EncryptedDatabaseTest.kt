@@ -80,7 +80,13 @@ class EncryptedDatabaseTest {
         Repository(db, Clock.systemDefaultZone()).updateSettings { it.copy(onboarded = true) }
         db.close()
         keys.destroy()
-        val failed = runCatching { Repository(open(KeyManager(context, alias, keyFile)), Clock.systemDefaultZone()).open() }.isFailure
-        assertTrue("The old database must be unreadable with a new key", failed)
+        // With a new key the old contents must be unreadable: SQLCipher either refuses the file or
+        // (with Android's default corruption handler) discards it and starts an empty database.
+        val settings = runCatching {
+            val repo = Repository(open(KeyManager(context, alias, keyFile)), Clock.systemDefaultZone())
+            repo.open()
+            repo.settings()
+        }
+        assertTrue("The old database must be unreadable with a new key", settings.isFailure || !settings.getOrThrow().onboarded)
     }
 }

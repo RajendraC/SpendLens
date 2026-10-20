@@ -1,17 +1,15 @@
 package com.spendlens.app
 
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.spendlens.app.ui.MainActivity
+import com.spendlens.app.ui.tapTag
+import com.spendlens.app.ui.tapText
+import com.spendlens.app.ui.typeInto
+import com.spendlens.app.ui.waitForTag
+import com.spendlens.app.ui.waitForText
+import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -32,51 +30,33 @@ class AppFlowDeviceTest {
     val rules: TestRule = RuleChain
         .outerRule(object : ExternalResource() {
             override fun before() {
-                ApplicationProvider.getApplicationContext<SpendLensApp>().container.eraseEverything()
+                runBlocking { ApplicationProvider.getApplicationContext<SpendLensApp>().container.eraseEverything() }
             }
         })
         .around(compose)
 
-    private fun AndroidComposeTestRule<*, *>.waitText(t: String) =
-        waitUntil(15_000) { onAllNodes(hasText(t, substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
-
-    private fun AndroidComposeTestRule<*, *>.tap(tag: String) {
-        waitUntil(15_000) { onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
-        runCatching { onNodeWithTag(tag).performScrollTo() }
-        onNodeWithTag(tag).performClick()
-        waitForIdle()
-    }
-
-    private fun AndroidComposeTestRule<*, *>.tapText(t: String) {
-        waitText(t)
-        runCatching { onNodeWithText(t).performScrollTo() }
-        onNodeWithText(t).performClick()
-        waitForIdle()
-    }
-
     @Test
     fun manualExpenseOverBudgetThenReset() {
         with(compose) {
-            tap("get_started")
-            tap("not_now")
-            tap("budget_input")
-            onNodeWithTag("budget_input").performTextReplacement("1000")
-            tap("save_budget")
-            waitText("SMS import is off")
+            tapTag("get_started")
+            tapTag("not_now")
+            typeInto("budget_input", "1000")
+            tapTag("save_budget")
+            waitForText("SMS import is off", timeoutMs = 20_000)
 
-            tap("add_expense")
-            onNodeWithTag("add_amount").performTextReplacement("1500")
-            onNodeWithTag("add_merchant").performTextReplacement("Tea stall")
-            tap("save_expense")
-            waitText("Tea stall")
-            waitText("over your monthly budget")
+            tapTag("add_expense")
+            typeInto("add_amount", "1500")
+            typeInto("add_merchant", "Tea stall")
+            tapTag("save_expense")
+            waitForText("over your monthly budget", timeoutMs = 20_000)
+            waitForText("Tea stall", timeoutMs = 20_000)
 
-            tap("tab_more")
+            tapTag("tab_more")
             tapText("Settings")
-            waitText("Encryption key")
+            waitForText("Encryption key", timeoutMs = 20_000)
             tapText("Reset SpendLens")
-            tap("confirm_reset")
-            waitUntil(15_000) { onAllNodes(hasTestTag("get_started")).fetchSemanticsNodes().isNotEmpty() }
+            tapTag("confirm_reset")
+            waitForTag("get_started", timeoutMs = 20_000)
         }
     }
 }

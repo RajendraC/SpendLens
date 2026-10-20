@@ -74,6 +74,8 @@ class KeyManager(
 
     private fun keyStore(): KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
+    // Synchronized with rawKey() and destroy(): two threads must never generate two different wrapping keys.
+    @Synchronized
     private fun wrappingKey(): SecretKey {
         val ks = keyStore()
         (ks.getKey(alias, null) as? SecretKey)?.let { return it }
