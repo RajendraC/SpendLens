@@ -17,6 +17,7 @@ import com.spendlens.core.Direction
 import com.spendlens.core.ImportFilters
 import com.spendlens.core.Institutions
 import com.spendlens.core.Money
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -233,7 +235,7 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
     val insights: StateFlow<Insights?> = combine(settings, budgets) { s, b -> (s?.budgetStartDay ?: 1) to (b[Schema.OVERALL] ?: 0L) }
         .flatMapLatest { (startDay, budget) ->
             val periods = (0 downTo -5).map { periodAt(startDay, it) }.reversed()
-            repo.observeTransactions(startMs(periods.first().start), startMs(periods.last().endExclusive)).map { txns ->
+            repo.observeTransactions(startMs(periods.first().start), startMs(periods.last().endExclusive)).map<List<Txn>, Insights?> { txns ->
                 buildInsights(txns, categories.value, periods, budget)
             }
         }
@@ -250,6 +252,7 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
                 _screen.value = Screen.DB_ERROR
                 return@launch
             }
+            launch(Dispatchers.IO) { keyProtection.value = runCatching { c.keyProtection() }.getOrDefault("Android Keystore") }
             val s = repo.settings()
             if (s.appLock) locked.value = true
             _screen.value = if (s.onboarded) Screen.HOME else Screen.WELCOME
@@ -540,7 +543,7 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
     fun performReset() = viewModelScope.launch {
         _confirm.value = null
         _sheet.value = null
-        c.eraseEverything()
+        withContext(Dispatchers.IO) { c.eraseEverything() }
         importUi.value = ImportUi()
         deleteUi.value = DeleteUi()
         monthOffset.value = 0
@@ -550,7 +553,8 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
         say("SpendLens was reset. Everything it stored on this phone is gone.")
     }
 
-    fun keyProtection(): String = c.keyProtection()
+    /** Where the database key lives, worked out once off the main thread (Keystore calls are slow). */
+    val keyProtection = MutableStateFlow("Checking\u2026")
 
     // ---------------- helpers ----------------
 

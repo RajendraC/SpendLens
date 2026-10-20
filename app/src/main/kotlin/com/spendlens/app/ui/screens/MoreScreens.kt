@@ -126,6 +126,7 @@ fun CategoriesScreen(vm: AppViewModel) {
 fun SettingsScreen(vm: AppViewModel, platform: Platform) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val storage by vm.storage.collectAsStateWithLifecycle()
+    val keyProtection by vm.keyProtection.collectAsStateWithLifecycle()
     val settings = s ?: return
     val f = settings.filters
     val sc = LocalStatusColors.current
@@ -146,7 +147,7 @@ fun SettingsScreen(vm: AppViewModel, platform: Platform) {
                 NavRow(Ic.finger, "Lock now") { vm.lockNow() }
             }
             Divider()
-            NavRow(Ic.shield, "Encryption key", vm.keyProtection(), trailing = {}) { }
+            NavRow(Ic.shield, "Encryption key", "AES-256 \u00b7 key held in $keyProtection", trailing = {}) { }
         }
 
         SectionLabel("SMS import")
