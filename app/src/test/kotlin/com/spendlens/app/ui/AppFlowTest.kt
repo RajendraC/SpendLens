@@ -3,9 +3,6 @@ package com.spendlens.app.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import com.spendlens.app.TestApp
 import org.junit.Rule
 import org.junit.Test
@@ -21,7 +18,8 @@ import org.robolectric.annotation.Config
  * expected totals are exact: October spend is ₹13,457 across 13 imported transactions.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = TestApp::class, sdk = [26, 28, 30, 33, 34, 35, 36])
+// A common 6.3" phone; ScreenSizesTest covers small phones, tablets, foldables and large fonts.
+@Config(application = TestApp::class, sdk = [26, 28, 30, 33, 34, 35, 36], qualifiers = "w393dp-h852dp-xxhdpi")
 class AppFlowTest {
 
     @get:Rule
@@ -39,7 +37,7 @@ class AppFlowTest {
 
             // Review: untick Netflix
             waitForText("13 of 13 selected")
-            onNodeWithText("Netflix").performScrollTo().performClick()
+            tapText("Netflix")
             waitForText("12 of 13 selected")
             tapTag("import_selected")
 

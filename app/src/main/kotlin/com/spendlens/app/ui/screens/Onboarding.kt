@@ -42,10 +42,12 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.spendlens.app.ui.AppViewModel
 import com.spendlens.app.ui.Platform
 import com.spendlens.app.ui.components.Gap
 import com.spendlens.app.ui.components.IconTile
+import com.spendlens.app.ui.components.InfoNote
 import com.spendlens.app.ui.components.Panel
 import com.spendlens.app.ui.theme.Ic
 import com.spendlens.core.Money
@@ -147,6 +149,7 @@ private fun Fact(label: String, text: String) {
 
 @Composable
 fun BudgetSetupScreen(vm: AppViewModel) {
+    val settings by vm.settings.collectAsStateWithLifecycle()
     var text by rememberSaveable { mutableStateOf("75000") }
     val rupees = text.filter { it.isDigit() }.take(8).toLongOrNull() ?: 0L
     Column(
@@ -176,6 +179,9 @@ fun BudgetSetupScreen(vm: AppViewModel) {
                     FilterChip(selected = rupees == v, onClick = { text = v.toString() }, label = { Text(Money.formatInr(v * 100)) })
                 }
             }
+        }
+        if (settings?.smsEnabled == false) {
+            InfoNote("You're in manual mode: add expenses with + on the home screen. You can turn on SMS import later in Settings.")
         }
         Gap(8.dp)
         Button(

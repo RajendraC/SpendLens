@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
@@ -328,41 +329,52 @@ fun UnsureBadge() {
 fun ImportingScreen(vm: AppViewModel) {
     val ui by vm.importUi.collectAsStateWithLifecycle()
     val r = ui.result
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Gap(24.dp)
-        Text(
-            if (!ui.running && r != null) "All set" else if (ui.mode == ImportMode.ONBOARDING) "Importing your transactions" else "Re-importing past messages",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            if (!ui.running && r != null) "Your transactions are saved, encrypted, on this phone." else "Reading only the messages you selected. Nothing leaves this phone.",
-            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Panel {
-            Row(Modifier.fillMaxWidth()) {
-                Text(if (ui.running) "Saving…" else "Import complete", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                Text("${(ui.progress * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
-            }
-            Gap(10.dp)
-            LinearProgressIndicator(progress = { ui.progress }, modifier = Modifier.fillMaxWidth())
-            if (r != null) {
-                Gap(14.dp)
-                StatRow("Transactions saved", r.saved.toString())
-                StatRow("Need a quick look", r.needsReview.toString())
-                StatRow("Duplicates merged", r.duplicates.toString())
-                StatRow("Left out by you", r.leftOut.toString())
-                if (r.removed > 0) StatRow("Removed by new filters", r.removed.toString())
-                if (r.byGroup.isNotEmpty()) {
-                    Gap(10.dp)
-                    Divider()
-                    Gap(10.dp)
-                    Text("SAVED BY SENDER", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    r.byGroup.entries.sortedByDescending { it.value }.forEach { (g, n) -> StatRow(Institutions.nameFor(g), "$n") }
+    val done = !ui.running && r != null
+    Column(Modifier.fillMaxSize()) {
+        // The summary scrolls on small phones; Continue stays pinned at the bottom.
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Gap(24.dp)
+            Text(
+                if (done) "All set" else if (ui.mode == ImportMode.ONBOARDING) "Importing your transactions" else "Re-importing past messages",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Text(
+                if (done) "Your transactions are saved, encrypted, on this phone." else "Reading only the messages you selected. Nothing leaves this phone.",
+                style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Panel {
+                Row(Modifier.fillMaxWidth()) {
+                    Text(if (ui.running) "Saving…" else "Import complete", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    Text("${(ui.progress * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
+                }
+                Gap(10.dp)
+                LinearProgressIndicator(progress = { ui.progress }, modifier = Modifier.fillMaxWidth())
+                if (r != null) {
+                    Gap(14.dp)
+                    StatRow("Transactions saved", r.saved.toString())
+                    StatRow("Need a quick look", r.needsReview.toString())
+                    StatRow("Duplicates merged", r.duplicates.toString())
+                    StatRow("Left out by you", r.leftOut.toString())
+                    if (r.removed > 0) StatRow("Removed by new filters", r.removed.toString())
+                    if (r.byGroup.isNotEmpty()) {
+                        Gap(10.dp)
+                        Divider()
+                        Gap(10.dp)
+                        Text("SAVED BY SENDER", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        r.byGroup.entries.sortedByDescending { it.value }.forEach { (g, n) -> StatRow(Institutions.nameFor(g), "$n") }
+                    }
                 }
             }
         }
-        if (!ui.running && r != null) {
-            Button(onClick = { vm.finishImport() }, modifier = Modifier.fillMaxWidth().height(56.dp).testTag("import_continue")) { Text("Continue") }
+        if (done) {
+            Surface(tonalElevation = 3.dp) {
+                Box(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Button(onClick = { vm.finishImport() }, modifier = Modifier.fillMaxWidth().height(56.dp).testTag("import_continue")) { Text("Continue") }
+                }
+            }
         }
     }
 }

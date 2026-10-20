@@ -310,8 +310,8 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
             _screen.value = Screen.SETTINGS
             say("SMS import is off. You can still add expenses yourself.")
         } else {
+            // No snackbar here: it would sit over the Save button. The budget screen explains manual mode.
             go(Screen.BUDGET_SETUP)
-            say("No problem. You're in manual mode: add expenses with +.")
         }
     }
 
