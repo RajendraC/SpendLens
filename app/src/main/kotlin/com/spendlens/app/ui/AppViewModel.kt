@@ -54,6 +54,7 @@ sealed interface Sheet {
     data class CategoryEdit(val id: String?) : Sheet
     data object AddExpense : Sheet
     data object DeleteData : Sheet
+    data object Skipped : Sheet
 }
 
 enum class ConfirmKind { DELETE, RESET }
@@ -327,7 +328,15 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
         go(Screen.IMPORT_FILTERS)
         viewModelScope.launch {
             val scan = runCatching { engine.scan() }.getOrElse { ImportEngine.Scan(emptyList(), emptyList(), emptyList()) }
-            importUi.update { it.copy(scanning = false, scan = scan) }
+            importUi.update { ui ->
+                // Unrecognised senders start switched off, but when they are all the inbox has, a
+                // first-time import would select nothing. Switch them on; they are flagged Unsure.
+                val onlyUnrecognised = scan.groups.isNotEmpty() && scan.groups.all { it.id == Institutions.UNRECOGNISED }
+                val draft = if (mode == ImportMode.ONBOARDING && onlyUnrecognised) {
+                    ui.draft.copy(disabledSenders = ui.draft.disabledSenders - Institutions.UNRECOGNISED)
+                } else ui.draft
+                ui.copy(scanning = false, scan = scan, draft = draft)
+            }
         }
     }
 
@@ -360,8 +369,29 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
     fun messagesFor(group: String): Int = importUi.value.scan?.let { engine.messagesInRange(it, importUi.value.draft, group) } ?: 0
     fun ignoredCount(): Int = importUi.value.scan?.let { engine.ignoredInRange(it, importUi.value.draft) } ?: 0
 
+    fun skipped(): List<ImportEngine.Skipped> = importUi.value.scan?.let { engine.skippedInRange(it, importUi.value.draft) }.orEmpty()
+
+    /** The skipped list as text to share for support, with long digit runs (account, card, phone, reference numbers) hidden. */
+    fun skippedReport(): String {
+        val items = skipped()
+        val fmt = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+        return buildString {
+            append("SpendLens skipped ${items.size} messages\n")
+            items.groupBy { it.reason }.toSortedMap(compareBy<com.spendlens.core.RejectReason> { SKIP_ORDER.indexOf(it) }).forEach { (reason, list) ->
+                append("\n== ${skipLabel(reason)} (${list.size})\n")
+                if (reason == com.spendlens.core.RejectReason.PERSONAL_SENDER) return@forEach
+                list.take(30).forEach { sk ->
+                    append("- ").append(sk.sender ?: "?").append(" · ").append(dateOf(sk.timestamp).format(fmt))
+                    sk.body?.let { append("\n  ").append(maskDigits(it.replace('\n', ' '))) }
+                    append('\n')
+                }
+                if (list.size > 30) append("  …and ${list.size - 30} more\n")
+            }
+        }
+    }
+
     fun toReview() {
-        if (selectable().isEmpty()) { say("Nothing selected. Tick a sender, and money in or money out."); return }
+        if (selectable().isEmpty()) { say("Nothing to import yet. Scroll up to tick a sender, or continue without importing."); return }
         importUi.update { it.copy(chip = ReviewChip.ALL) }
         go(Screen.IMPORT_REVIEW)
     }
@@ -630,6 +660,32 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
 
     companion object {
         const val LOCK_AFTER_MS = 60_000L
+
+        /** Most useful first: messages that may be real transactions the parser missed. */
+        val SKIP_ORDER = listOf(
+            com.spendlens.core.RejectReason.NO_AMOUNT, com.spendlens.core.RejectReason.NOT_A_TRANSACTION,
+            com.spendlens.core.RejectReason.FUTURE_OR_REMINDER, com.spendlens.core.RejectReason.REQUEST,
+            com.spendlens.core.RejectReason.FAILED, com.spendlens.core.RejectReason.PROMOTIONAL,
+            com.spendlens.core.RejectReason.GOVERNMENT, com.spendlens.core.RejectReason.OTP,
+            com.spendlens.core.RejectReason.PERSONAL_SENDER,
+        )
+
+        fun skipLabel(r: com.spendlens.core.RejectReason): String = when (r) {
+            com.spendlens.core.RejectReason.NO_AMOUNT -> "No amount found"
+            com.spendlens.core.RejectReason.NOT_A_TRANSACTION -> "No money moved (no debit or credit wording)"
+            com.spendlens.core.RejectReason.FUTURE_OR_REMINDER -> "Reminders and scheduled payments"
+            com.spendlens.core.RejectReason.REQUEST -> "Payment requests"
+            com.spendlens.core.RejectReason.FAILED -> "Failed or declined payments"
+            com.spendlens.core.RejectReason.PROMOTIONAL -> "Promotions and offers"
+            com.spendlens.core.RejectReason.GOVERNMENT -> "Government messages"
+            com.spendlens.core.RejectReason.OTP -> "OTPs and codes (text hidden)"
+            com.spendlens.core.RejectReason.PERSONAL_SENDER -> "Messages from people (never shown)"
+        }
+
+        private val LONG_DIGITS = Regex("""\d{4,}""")
+
+        /** 4821 -> ##21, 629112345678 -> ##########78. Amounts like 1,240.00 keep their digits. */
+        fun maskDigits(s: String): String = LONG_DIGITS.replace(s) { m -> "#".repeat(m.value.length - 2) + m.value.takeLast(2) }
         private val SHORT = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
     }
 }

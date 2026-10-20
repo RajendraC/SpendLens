@@ -191,6 +191,13 @@ fun SettingsScreen(vm: AppViewModel, platform: Platform) {
         SectionLabel("About")
         Panel(padding = 12.dp) {
             NavRow(Ic.doc, "Privacy policy", "What SpendLens reads, keeps and never does") { vm.go(Screen.PRIVACY) }
+            Divider()
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val version = androidx.compose.runtime.remember {
+                @Suppress("DEPRECATION")
+                runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+            }
+            NavRow(Ic.info, "Version", version, trailing = {}) { }
         }
     }
 }

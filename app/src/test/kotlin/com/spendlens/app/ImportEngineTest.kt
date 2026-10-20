@@ -161,6 +161,27 @@ class ImportEngineTest {
     }
 
     @Test
+    fun skippedMessagesAreListedWithoutPersonalTextsOrOtpCodes() = runBlocking {
+        val c = testContainer(context)
+        val scan = c.importEngine.scan()
+        assertEquals(scan.messagesRead.size - scan.candidates.size, scan.skipped.size)
+        assertTrue(scan.skipped.isNotEmpty())
+        scan.skipped.filter { it.reason == com.spendlens.core.RejectReason.PERSONAL_SENDER }.forEach {
+            assertEquals(null, it.sender); assertEquals(null, it.body)
+        }
+        scan.skipped.filter { it.reason == com.spendlens.core.RejectReason.OTP }.forEach { assertEquals(null, it.body) }
+    }
+
+    @Test
+    fun maskDigitsHidesAccountAndReferenceNumbersButKeepsAmounts() {
+        assertEquals(
+            "Sent Rs.486.00 From A/C *##21 Ref ##########78 on 18/10/26",
+            com.spendlens.app.ui.AppViewModel.maskDigits("Sent Rs.486.00 From A/C *4821 Ref 629112345678 on 18/10/26"),
+        )
+        assertEquals("Rs 1,240.00", com.spendlens.app.ui.AppViewModel.maskDigits("Rs 1,240.00"))
+    }
+
+    @Test
     fun eraseEverythingStartsFresh() = runBlocking {
         val c = testContainer(context)
         val e = c.importEngine

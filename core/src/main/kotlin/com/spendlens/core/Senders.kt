@@ -6,27 +6,38 @@ enum class HeaderType { TRANSACTIONAL, SERVICE, PROMOTIONAL, GOVERNMENT, UNMARKE
 data class SenderHeader(val raw: String, val entity: String, val type: HeaderType)
 
 object SenderParser {
-    // e.g. VM-HDFCBK-S, AD-SBIUPI, JD-ICICIT-T
+    // VM-HDFCBK-S, AD-SBIUPI, JD-ICICIT-T: operator and circle prefix, DLT entity, TRAI suffix
     private val DLT = Regex("""^([A-Za-z]{2})-([A-Za-z0-9]{3,9})(?:-([A-Za-z]))?$""")
-    // Some phones strip the operator prefix and show just HDFCBK
-    private val BARE = Regex("""^[A-Za-z]{6}$""")
+    // HDFCBK-S: prefix stripped, suffix kept
+    private val NO_PREFIX = Regex("""^([A-Za-z0-9]{3,9})-([A-Za-z])$""")
+    // AXHDFCBK: prefix joined to the entity without a hyphen
+    private val JOINED = Regex("""^([A-Za-z]{2})([A-Za-z0-9]{6})$""")
+    // HDFCBK, SBIUPI: just the entity. Needs a letter; digits-only senders are phone numbers or short codes.
+    private val BARE = Regex("""^[A-Za-z0-9]{3,9}$""")
 
-    /** Returns null for phone numbers and anything that is not a business header: those are personal messages. */
+    /**
+     * Returns null for phone numbers and short codes: those are personal messages. In India only
+     * registered businesses can send from a name, so any 3-9 character sender with a letter is a header.
+     */
     fun parse(address: String?): SenderHeader? {
-        val a = address?.trim().orEmpty()
-        if (a.isEmpty()) return null
-        DLT.matchEntire(a)?.let { m ->
-            val type = when (m.groupValues[3].uppercase()) {
-                "T" -> HeaderType.TRANSACTIONAL
-                "S" -> HeaderType.SERVICE
-                "P" -> HeaderType.PROMOTIONAL
-                "G" -> HeaderType.GOVERNMENT
-                else -> HeaderType.UNMARKED
-            }
-            return SenderHeader(a, m.groupValues[2].uppercase(), type)
+        val a = address?.trim()?.removePrefix("+")?.trim().orEmpty()
+        if (a.isEmpty() || a.none { it.isLetter() }) return null
+        DLT.matchEntire(a)?.let { m -> return SenderHeader(a, m.groupValues[2].uppercase(), typeOf(m.groupValues[3])) }
+        NO_PREFIX.matchEntire(a)?.let { m -> return SenderHeader(a, m.groupValues[1].uppercase(), typeOf(m.groupValues[2])) }
+        JOINED.matchEntire(a)?.let { m ->
+            val entity = m.groupValues[2].uppercase()
+            if (Institutions.forEntity(entity) != null) return SenderHeader(a, entity, HeaderType.UNMARKED)
         }
         if (BARE.matches(a)) return SenderHeader(a, a.uppercase(), HeaderType.UNMARKED)
         return null
+    }
+
+    private fun typeOf(suffix: String) = when (suffix.uppercase()) {
+        "T" -> HeaderType.TRANSACTIONAL
+        "S" -> HeaderType.SERVICE
+        "P" -> HeaderType.PROMOTIONAL
+        "G" -> HeaderType.GOVERNMENT
+        else -> HeaderType.UNMARKED
     }
 }
 

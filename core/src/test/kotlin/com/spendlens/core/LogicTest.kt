@@ -39,6 +39,18 @@ class SenderTest {
         assertNull(SenderParser.parse("56161"))
     }
 
+    @Test fun readsHeadersInEveryFormatPhonesUse() {
+        assertEquals("HDFCBK", SenderParser.parse("HDFCBK")!!.entity)
+        assertEquals("HDFCBK", SenderParser.parse("HDFCBK-S")!!.entity)
+        assertEquals(HeaderType.SERVICE, SenderParser.parse("HDFCBK-S")!!.type)
+        assertEquals("HDFCBK", SenderParser.parse("AXHDFCBK")!!.entity)
+        assertEquals("HDFCBANK", SenderParser.parse("HDFCBANK")!!.entity)
+        assertEquals("ICICIT", SenderParser.parse("JM-ICICIT-T")!!.entity)
+        assertEquals("SBIINB", SenderParser.parse("SBIINB")!!.entity)
+        assertNull(SenderParser.parse("9876543210"))
+        assertNull(SenderParser.parse("+91 98765 43210"))
+    }
+
     @Test fun mapsEntitiesToBanks() {
         assertEquals("hdfc", Institutions.forEntity("HDFCBK")!!.id)
         assertEquals("sbi", Institutions.forEntity("ATMSBI")!!.id)

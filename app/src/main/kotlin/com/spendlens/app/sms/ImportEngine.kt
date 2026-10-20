@@ -12,6 +12,7 @@ import com.spendlens.core.KnownMerchant
 import com.spendlens.core.MerchantRegistry
 import com.spendlens.core.ParseResult
 import com.spendlens.core.ParsedTransaction
+import com.spendlens.core.RejectReason
 import com.spendlens.core.SmsParser
 import com.spendlens.core.TxKind
 import java.time.Clock
@@ -43,19 +44,38 @@ class ImportEngine(
 
     data class SenderGroup(val id: String, val name: String, val detail: String)
 
+    /**
+     * A message the parser left out, kept in memory only for the "See what was skipped" list.
+     * Messages from people keep neither sender nor text, and OTPs keep no text.
+     */
+    data class Skipped(val sender: String?, val reason: RejectReason, val body: String?, val timestamp: Long)
+
     /** One read of the inbox covering the longest range the user can pick (12 months). */
     data class Scan(
         val candidates: List<Candidate>,   // newest first
         val messagesRead: List<Long>,      // timestamps of every message read, for "ignored" counts
         val groups: List<SenderGroup>,
+        val skipped: List<Skipped> = emptyList(),  // newest first
     )
 
     suspend fun scan(months: Int = MAX_MONTHS): Scan {
         val since = LocalDate.now(clock).minusMonths(months.toLong()).atStartOfDay(zone).toInstant().toEpochMilli()
         val messages = sms.read(since)
-        val candidates = messages.mapNotNull { m ->
-            (SmsParser.parse(m) as? ParseResult.Accepted)?.tx?.let { toCandidate(it) }
-        }.sortedByDescending { it.tx.timestamp }
+        val candidates = ArrayList<Candidate>()
+        val skipped = ArrayList<Skipped>()
+        for (m in messages) {
+            when (val r = SmsParser.parse(m)) {
+                is ParseResult.Accepted -> candidates += toCandidate(r.tx)
+                is ParseResult.Rejected -> skipped += Skipped(
+                    sender = if (r.reason == RejectReason.PERSONAL_SENDER) null else m.address,
+                    reason = r.reason,
+                    body = if (r.reason == RejectReason.PERSONAL_SENDER || r.reason == RejectReason.OTP) null else m.body,
+                    timestamp = m.timestamp,
+                )
+            }
+        }
+        candidates.sortByDescending { it.tx.timestamp }
+        skipped.sortByDescending { it.timestamp }
         val groups = candidates.groupBy { it.tx.senderGroup }.map { (id, list) ->
             val name = list.first().tx.institutionName ?: "Unrecognised senders"
             val accounts = list.mapNotNull { c -> c.tx.accountLast4?.let { (if (c.tx.isCard) "Card ••" else "A/c ••") + it } }
@@ -65,7 +85,7 @@ class ImportEngine(
             else (accounts + listOfNotNull(headers.firstOrNull()?.key)).joinToString(" · ")
             SenderGroup(id, name, detail)
         }.sortedWith(compareBy<SenderGroup> { it.id == Institutions.UNRECOGNISED }.thenByDescending { g -> candidates.count { it.tx.senderGroup == g.id } })
-        return Scan(candidates, messages.map { it.timestamp }, groups)
+        return Scan(candidates, messages.map { it.timestamp }, groups, skipped)
     }
 
     fun toCandidate(t: ParsedTransaction): Candidate {
@@ -100,6 +120,11 @@ class ImportEngine(
         val read = scan.messagesRead.count { it >= from }
         val tx = scan.candidates.count { it.tx.timestamp >= from }
         return (read - tx).coerceAtLeast(0)
+    }
+
+    fun skippedInRange(scan: Scan, filters: ImportFilters): List<Skipped> {
+        val from = rangeStart(filters)
+        return scan.skipped.filter { it.timestamp >= from }
     }
 
     fun monthOf(c: Candidate): YearMonth = YearMonth.from(Instant.ofEpochMilli(c.tx.timestamp).atZone(zone))

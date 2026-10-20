@@ -1,5 +1,7 @@
 package com.spendlens.app.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,13 +53,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.spendlens.app.data.Schema
 import com.spendlens.app.ui.AppViewModel
 import com.spendlens.app.ui.DeleteOption
 import com.spendlens.app.ui.Sheet
+import com.spendlens.app.ui.UiMessage
 import com.spendlens.app.ui.components.CategoryTile
 import com.spendlens.app.ui.components.Divider
 import com.spendlens.app.ui.components.Gap
@@ -71,6 +76,7 @@ import com.spendlens.core.Cat
 import com.spendlens.core.Direction
 import com.spendlens.core.Institutions
 import com.spendlens.core.Money
+import com.spendlens.core.RejectReason
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -92,6 +98,7 @@ fun SheetHost(vm: AppViewModel) {
                 is Sheet.CategoryEdit -> CategoryEditSheet(vm, current.id)
                 Sheet.AddExpense -> AddExpenseSheet(vm)
                 Sheet.DeleteData -> DeleteSheet(vm)
+                Sheet.Skipped -> SkippedSheet(vm)
             }
         }
     }
@@ -448,3 +455,56 @@ private fun DeleteSheet(vm: AppViewModel) {
     ) { Text(if (d.selectedCount > 0) "Delete ${d.selectedCount} transactions" else "Nothing to delete") }
 }
 
+
+// ---------------- skipped messages ----------------
+
+/**
+ * Why messages were left out, so a bank format SpendLens doesn't know yet can be spotted and shared.
+ * Nothing here is stored: the list lives in memory for this import only.
+ */
+@Composable
+private fun SkippedSheet(vm: AppViewModel) {
+    val ui by vm.importUi.collectAsStateWithLifecycle()
+    val items = remember(ui.scan, ui.draft) { vm.skipped() }
+    val context = LocalContext.current
+    val fmt = remember { DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH) }
+    val groups = remember(items) { items.groupBy { it.reason } }
+
+    SheetTitle("Skipped messages", "${items.size} messages in this period weren't read as transactions. None of them is stored.")
+    InfoNote(
+        "If a real payment is listed here, tap Copy and send it to whoever maintains SpendLens. " +
+            "Account, card, phone and reference numbers are hidden in the copy.",
+    )
+    Button(
+        onClick = {
+            context.getSystemService(ClipboardManager::class.java)
+                ?.setPrimaryClip(ClipData.newPlainText("SpendLens skipped messages", vm.skippedReport()))
+            vm.messages.tryEmit(UiMessage("Copied, with account and card numbers hidden"))
+        },
+        modifier = Modifier.fillMaxWidth().height(48.dp).testTag("copy_skipped"),
+    ) { Text("Copy list to share") }
+
+    AppViewModel.SKIP_ORDER.filter { it in groups }.forEach { reason ->
+        val list = groups.getValue(reason)
+        Text("${AppViewModel.skipLabel(reason)} \u00b7 ${list.size}", style = MaterialTheme.typography.titleSmall)
+        if (reason == RejectReason.PERSONAL_SENDER) {
+            Text("Texts from phone numbers are skipped without being read further.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            return@forEach
+        }
+        Panel(padding = 12.dp) {
+            list.take(30).forEachIndexed { i, sk ->
+                if (i > 0) Divider()
+                Column(Modifier.padding(vertical = 6.dp)) {
+                    Text("${sk.sender ?: "?"} \u00b7 ${vm.dateOf(sk.timestamp).format(fmt)}", style = MaterialTheme.typography.labelLarge)
+                    sk.body?.let {
+                        Text(
+                            it.replace('\n', ' '), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 4, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (list.size > 30) Text("\u2026and ${list.size - 30} more", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}

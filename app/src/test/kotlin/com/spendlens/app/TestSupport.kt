@@ -27,6 +27,11 @@ fun testContainer(context: Context, inbox: MutableList<SmsMessage> = sampleInbox
 
 /** Application used by Robolectric UI tests: same app, test container, no background scheduling. */
 class TestApp : SpendLensApp() {
-    override fun createContainer(): AppContainer = testContainer(this)
+    override fun createContainer(): AppContainer = testContainer(this, inboxOverride ?: sampleInbox())
     override val scheduleBackgroundSync: Boolean = false
+
+    companion object {
+        /** Set before the activity starts (from an outer rule) to give one test its own inbox. */
+        var inboxOverride: MutableList<SmsMessage>? = null
+    }
 }

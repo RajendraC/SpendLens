@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -106,10 +107,14 @@ fun ImportFiltersScreen(vm: AppViewModel) {
                             Text("Looking through your inbox…")
                         }
                     } else if (senders.isEmpty()) {
-                        Text(
-                            "No bank, card or UPI messages found in the last 12 months.",
-                            modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Column(Modifier.padding(16.dp)) {
+                            Text("No bank, card or UPI transactions found in the last 12 months", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "If your bank's messages are in your inbox, tap See what was skipped below to check why, " +
+                                    "or continue without importing and add expenses yourself.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     } else {
                         senders.forEachIndexed { i, g ->
                             if (i > 0) Divider()
@@ -190,20 +195,36 @@ fun ImportFiltersScreen(vm: AppViewModel) {
             item {
                 InfoNote(
                     "Always skipped: OTPs, promotional (-P) messages and texts from people. " +
-                        "${vm.ignoredCount()} messages in this period are ignored this way and never stored.",
+                        "${vm.ignoredCount()} messages in this period are skipped and never stored.",
                     icon = Ic.shield, container = MaterialTheme.colorScheme.primaryContainer, content = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
+            }
+            if (!ui.scanning && vm.ignoredCount() > 0) item {
+                OutlinedButton(
+                    onClick = { vm.openSheet(com.spendlens.app.ui.Sheet.Skipped) },
+                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("see_skipped"),
+                ) { Text("See what was skipped (${vm.ignoredCount()})") }
             }
         }
         Surface(tonalElevation = 3.dp) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    if (ui.scanning) "Scanning…" else if (selectable.isEmpty()) "Nothing selected yet" else "${selectable.size} transactions from $sendersOn of ${senders.size} senders",
+                    if (ui.scanning) "Scanning…" else if (selectable.isEmpty() && senders.isEmpty()) "No transactions found" else if (selectable.isEmpty()) "Nothing selected: tick a sender above" else "${selectable.size} transactions from $sendersOn of ${senders.size} senders",
                     style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("import_summary"),
                 )
                 Gap(6.dp)
-                if (onboarding) {
+                if (onboarding && !ui.scanning && selectable.isEmpty()) {
+                    // Never a dead end: with nothing to import, carry on in manual mode.
+                    Button(onClick = { vm.chooseManualMode() }, modifier = Modifier.fillMaxWidth().height(52.dp).testTag("continue_manual")) {
+                        Text("Continue without importing")
+                    }
+                    Text(
+                        "You can import later from More → Settings → What to import.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                } else if (onboarding) {
                     Button(onClick = { vm.toReview() }, enabled = !ui.scanning, modifier = Modifier.fillMaxWidth().height(52.dp).testTag("review_button")) {
                         Text(if (selectable.isEmpty()) "Review transactions" else "Review ${selectable.size} transactions")
                     }

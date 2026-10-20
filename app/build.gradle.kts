@@ -15,13 +15,21 @@ android {
         applicationId = "com.spendlens.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
-        // Release signing comes from environment variables so no key ever lives in the repository.
+        // A fixed debug key, committed on purpose: every GitHub build is signed the same way, so a new
+        // app-debug.apk installs over the old one and keeps your data. It is not secret and is for testing only.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        // Release signing comes from environment variables so no release key ever lives in the repository.
         create("release") {
             val storePath = System.getenv("SPENDLENS_KEYSTORE")
             if (storePath != null) {
