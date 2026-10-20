@@ -1,14 +1,20 @@
 package com.spendlens.app.ui
 
+import android.content.Context
+import android.hardware.biometrics.BiometricManager
+import android.os.Build
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.test.core.app.ApplicationProvider
 import com.spendlens.app.TestApp
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowBiometricManager
 
 /**
  * Full user journeys through the real UI, repeated on every Android version the app supports:
@@ -66,9 +72,24 @@ class AppFlowTest {
             tapTag("tab_more")
             tapText("Settings")
             tapText("Reset SpendLens")
+            if (Build.VERSION.SDK_INT >= 30) {
+                // Robolectric's phone has a fingerprint set up: Reset must ask for it first.
+                waitForText("Confirm it's you")
+                tapText("Cancel")
+                phoneHasNoScreenLock()
+                tapText("Reset SpendLens")
+            }
+            waitForText("Erase everything")
             tapTag("confirm_reset")
             waitForTag("get_started")
         }
+    }
+
+    /** Turns the simulated fingerprint and screen lock off (Android 10+), as on a phone with no lock set. */
+    private fun phoneHasNoScreenLock() {
+        if (Build.VERSION.SDK_INT < 29) return
+        val bm = ApplicationProvider.getApplicationContext<Context>().getSystemService(BiometricManager::class.java)
+        Shadow.extract<ShadowBiometricManager>(bm).setCanAuthenticate(false)
     }
 
     @Test

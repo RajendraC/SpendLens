@@ -85,6 +85,7 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -96,6 +97,9 @@ jobs:
           - { api: 34, arch: x86_64, profile: pixel_c }    # Android 14, 10-inch tablet
           - { api: 35, arch: x86_64, profile: pixel_6 }    # Android 15
           - { api: 36, arch: x86_64, profile: pixel_6 }    # Android 16
+          # Android 17 with 16 KB memory pages, as on a Pixel 10. Google ships this image as
+          # android-37.0 / google_apis_ps16k; marked experimental so a missing image can't block the build.
+          - { api: 37, image: "37.0", target: google_apis_ps16k, arch: x86_64, profile: pixel_6, experimental: true }
     steps:
       - uses: actions/checkout@v4
 
@@ -124,7 +128,8 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
-          target: google_apis
+          system-image-api-level: ${{ matrix.image || matrix.api }}
+          target: ${{ matrix.target || 'google_apis' }}
           arch: ${{ matrix.arch }}
           profile: ${{ matrix.profile }}
           ram-size: 3072M
