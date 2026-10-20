@@ -123,9 +123,10 @@ class Repository(private val db: Db, private val clock: Clock) {
         }
     }
 
-    suspend fun setBudget(key: String, limitPaise: Long?) = write { d ->
+    suspend fun setBudget(key: String, limitPaise: Long?): Unit = write { d ->
         if (limitPaise == null || limitPaise <= 0) d.delete("budgets", "category_key = ?", arrayOf<Any?>(key))
         else d.insert("budgets", CONFLICT_REPLACE, contentValuesOf("category_key" to key, "limit_paise" to limitPaise))
+        Unit
     }
 
     // ---------------- transactions ----------------

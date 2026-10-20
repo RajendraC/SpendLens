@@ -244,6 +244,9 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
 
     // ---------------- startup, lock, sync ----------------
 
+    /** Where the database key lives, worked out once off the main thread (Keystore calls are slow). */
+    val keyProtection = MutableStateFlow("Checking\u2026")
+
     init {
         viewModelScope.launch {
             try {
@@ -552,9 +555,6 @@ class AppViewModel(private val c: AppContainer) : ViewModel() {
         _screen.value = Screen.WELCOME
         say("SpendLens was reset. Everything it stored on this phone is gone.")
     }
-
-    /** Where the database key lives, worked out once off the main thread (Keystore calls are slow). */
-    val keyProtection = MutableStateFlow("Checking\u2026")
 
     // ---------------- helpers ----------------
 
