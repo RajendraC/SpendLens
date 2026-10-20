@@ -33,6 +33,15 @@ Requirements: Android Studio (latest stable), which bundles a JDK. On the comman
 ./gradlew :app:connectedDebugAndroidTest   # with a phone or emulator connected
 ```
 
+Every push to `main` runs `.github/workflows/android.yml` on GitHub Actions:
+
+| Stage | What runs |
+| --- | --- |
+| Build | Parser and budget tests; debug and release APKs; Robolectric journeys on Android 8, 9, 11, 13, 14, 15 and 16 plus small phone, large phone, tablet, foldable, dark mode and 1.5× font; lint; no INTERNET permission; 16 KB page-size alignment |
+| Emulators | Pixel 2 (Android 8), Pixel 3a (10), Pixel 5 (12), Pixel 6 (13, 15, 16), Pixel C tablet (14): encrypted database, Keystore key, real SMS inbox, full app journey and reset |
+
+The APKs are attached to each run as the `spendlens-apks` artifact. Android 17 emulator images don't boot reliably on GitHub's standard runners, so Android 17 is tested on a real phone.
+
 Installing on your phone: see the step-by-step guide shared with this project.
 
 ## Versions
