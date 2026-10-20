@@ -55,6 +55,24 @@ jobs:
             echo "::error::The APK requests INTERNET"; exit 1
           fi
 
+      - name: Check native libraries support 16 KB memory pages (Android 15+ devices, Google Play)
+        shell: bash
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
+          "${BT}zipalign" -c -P 16 4 "$APK" && echo "APK zip alignment: 16 KB OK"
+          rm -rf so && mkdir so && unzip -q -o "$APK" 'lib/*' -d so
+          fail=0
+          for f in so/lib/arm64-v8a/*.so so/lib/x86_64/*.so; do
+            [ -f "$f" ] || continue
+            align=$(readelf -lW "$f" | awk '$1=="LOAD"{print $NF}' | sort -u | tr '\n' ' ')
+            echo "$f: LOAD alignment $align"
+            for a in $align; do
+              [ $((a)) -ge 16384 ] || fail=1
+            done
+          done
+          [ "$fail" -eq 0 ] || { echo "::error::A 64-bit native library is not 16 KB aligned"; exit 1; }
+
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
@@ -85,7 +103,6 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -97,9 +114,8 @@ jobs:
           - { api: 34, arch: x86_64, profile: pixel_c }    # Android 14, 10-inch tablet
           - { api: 35, arch: x86_64, profile: pixel_6 }    # Android 15
           - { api: 36, arch: x86_64, profile: pixel_6 }    # Android 16
-          # Android 17 (latest stable update, 37.2) with 16 KB memory pages, as on a Pixel 10.
-          # Google names both the platform and the image "android-37.2"; image target google_apis_ps16k.
-          - { api: "37.2", target: google_apis_ps16k, arch: x86_64, profile: pixel_6, ram: 4096M, cores: 4, experimental: true }
+          # Android 17 isn't in the matrix: its emulator images (android-37.x, 16 KB pages only) didn't
+          # boot stably on GitHub's standard 4-core runners in October 2026. Test on an Android 17 phone.
     steps:
       - uses: actions/checkout@v4
 
@@ -124,23 +140,14 @@ jobs:
           mkdir -p logs
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee logs/build.log
 
-      - name: List the Android 17 emulator images on offer
-        if: matrix.experimental
-        shell: bash
-        run: |
-          mkdir -p logs
-          SDKM="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin | sort -V | tail -1)/sdkmanager"
-          "$SDKM" --list 2>/dev/null | grep -E "system-images;android-3[6-9]|platforms;android-3[6-9]" | awk '{print $1}' | sort -u | tee logs/sdk-images.txt || true
-
       - name: Run tests on the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
-          target: ${{ matrix.target || 'google_apis' }}
+          target: google_apis
           arch: ${{ matrix.arch }}
           profile: ${{ matrix.profile }}
-          ram-size: ${{ matrix.ram || '3072M' }}
-          cores: ${{ matrix.cores || 2 }}
+          ram-size: 3072M
           disk-size: 4096M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           disable-animations: true
