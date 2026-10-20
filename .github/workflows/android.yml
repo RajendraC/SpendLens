@@ -99,7 +99,7 @@ jobs:
           - { api: 36, arch: x86_64, profile: pixel_6 }    # Android 16
           # Android 17 (latest stable update, 37.2) with 16 KB memory pages, as on a Pixel 10.
           # Google names both the platform and the image "android-37.2"; image target google_apis_ps16k.
-          - { api: "37.2", target: google_apis_ps16k, arch: x86_64, profile: pixel_6, experimental: true }
+          - { api: "37.2", target: google_apis_ps16k, arch: x86_64, profile: pixel_6, ram: 4096M, cores: 4, experimental: true }
     steps:
       - uses: actions/checkout@v4
 
@@ -139,7 +139,8 @@ jobs:
           target: ${{ matrix.target || 'google_apis' }}
           arch: ${{ matrix.arch }}
           profile: ${{ matrix.profile }}
-          ram-size: 3072M
+          ram-size: ${{ matrix.ram || '3072M' }}
+          cores: ${{ matrix.cores || 2 }}
           disk-size: 4096M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           disable-animations: true

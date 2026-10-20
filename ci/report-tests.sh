@@ -29,6 +29,9 @@ with open(sys.argv[1], "w") as f:
     f.write("\n".join(rows) if rows else "| (no results found) | | | |")
     f.write("\n")
 PY
+if [ -s logs/ready.log ]; then
+  { printf '\n### Emulator readiness\n\n```\n'; tail -10 logs/ready.log; printf '```\n'; } >> "$out"
+fi
 if [ -s logs/seed.log ]; then
   { printf '\n### SMS seeding\n\n```\n'; tail -20 logs/seed.log; printf '```\n'; } >> "$out"
 fi
