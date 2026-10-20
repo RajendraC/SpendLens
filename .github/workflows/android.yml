@@ -12,11 +12,12 @@ concurrency:
 
 permissions:
   contents: read
+  checks: write   # lets a failed job publish its error excerpt as a check result
 
 jobs:
   build:
     name: Build, unit tests, simulated devices, lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -29,16 +30,22 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Parser and budget logic tests
-        run: ./gradlew :core:test --stacktrace
+        shell: bash
+        run: |
+          mkdir -p logs
+          ./gradlew :core:test --stacktrace 2>&1 | tee logs/core.log
 
       - name: Build debug and release APKs
-        run: ./gradlew :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest --stacktrace
+        shell: bash
+        run: ./gradlew :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest :app:compileDebugUnitTestKotlin --continue --stacktrace 2>&1 | tee logs/build.log
 
       - name: App tests on Android 8.0 to 16 and six screen sizes (Robolectric)
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
+        shell: bash
+        run: ./gradlew :app:testDebugUnitTest --continue --stacktrace 2>&1 | tee logs/unit.log
 
       - name: Lint
-        run: ./gradlew :app:lintDebug --stacktrace
+        shell: bash
+        run: ./gradlew :app:lintDebug --stacktrace 2>&1 | tee logs/lint.log
 
       - name: Check the release APK requests no internet permission
         run: |
@@ -56,6 +63,12 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/app-release.apk
 
+      - name: Publish failure details
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash ci/report-failure.sh "Failure details · build"
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -70,7 +83,7 @@ jobs:
   device-tests:
     name: Emulator · API ${{ matrix.api }} · ${{ matrix.profile }}
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -102,7 +115,10 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Build app and test APKs
-        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+        shell: bash
+        run: |
+          mkdir -p logs
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee logs/build.log
 
       - name: Run tests on the emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -115,9 +131,13 @@ jobs:
           disk-size: 4096M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           disable-animations: true
-          script: |
-            bash ci/seed-sms.sh
-            ./gradlew :app:connectedDebugAndroidTest --stacktrace
+          script: bash ci/device-tests.sh
+
+      - name: Publish failure details
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash ci/report-failure.sh "Failure details · API ${{ matrix.api }}"
 
       - name: Upload device test reports
         if: always()
