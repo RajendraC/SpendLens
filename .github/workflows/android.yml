@@ -124,6 +124,14 @@ jobs:
           mkdir -p logs
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee logs/build.log
 
+      - name: List the Android 17 emulator images on offer
+        if: matrix.experimental
+        shell: bash
+        run: |
+          mkdir -p logs
+          SDKM="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin | sort -V | tail -1)/sdkmanager"
+          "$SDKM" --list 2>/dev/null | grep -E "system-images;android-3[6-9]|platforms;android-3[6-9]" | awk '{print $1}' | sort -u | tee logs/sdk-images.txt || true
+
       - name: Run tests on the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:

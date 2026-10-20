@@ -20,6 +20,13 @@ if ls logs/*.log >/dev/null 2>&1; then
   endsection
 fi
 
+# 1b. SDK packages listed by the job, if any
+if [ -s logs/sdk-images.txt ]; then
+  section "Emulator images and platforms available"
+  cat logs/sdk-images.txt >> "$out"
+  endsection
+fi
+
 # 2. Failed unit / instrumented tests, from the JUnit XML reports
 xmls=$(find . -path ./node_modules -prune -o \( -path "*/test-results/*" -o -path "*/androidTest-results/*" \) -name "*.xml" -print 2>/dev/null)
 if [ -n "$xmls" ]; then
